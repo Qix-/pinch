@@ -126,6 +126,10 @@ class Walker {
 	}
 
 	*lookup(v) {
+		if (typeof v !== 'string') {
+			throw new Error(`can only lookup strings (got ${typeof v}: ${v})`);
+		}
+
 		let id = this.lookups.get(v);
 
 		if (id === undefined) {
@@ -355,7 +359,9 @@ class Walker {
 			if (prop.computed) {
 				yield* this.traverse(prop.key);
 			} else {
-				yield* this.lookup(prop.key.name);
+				// XXX This is weird, should probably handle this better.
+				// XXX I did this since it might either be an Identifier or a Literal.
+				yield* this.lookup(prop.key.raw ?? prop.key.name);
 			}
 
 			if (!prop.shorthand) {
@@ -430,7 +436,7 @@ class Walker {
 		);
 
 		if (n.declarations.length === 1) {
-			yield* this.lookup(n.declarations[0].id);
+			yield* this.lookup(n.declarations[0].id.name);
 			if (n.declarations[0].init) yield* this.traverse(n.declarations[0].init);
 		} else {
 			let initBits = 0n;
@@ -442,7 +448,7 @@ class Walker {
 			yield* encodeBigInt(initBits);
 
 			for (const decl of n.declarations) {
-				yield* this.lookup(decl.id);
+				yield* this.lookup(decl.id.name);
 				if (decl.init) yield* this.traverse(decl.init);
 			}
 
@@ -563,7 +569,7 @@ class Walker {
 	}
 }
 
-function compile(source, acornOpts = {}) {
+function* generateBuffers(source, acornOpts) {
 	const ast = acorn.parse(source, {
 		ecmaVersion: 'latest',
 		locations: true,
@@ -571,10 +577,45 @@ function compile(source, acornOpts = {}) {
 	});
 
 	const walker = new Walker();
-	const chunks = [...walker.traverse(ast)];
-	console.log(walker.lookups);
 
-	return Buffer.from(chunks);
+	const chunks = [...walker.traverse(ast)];
+	chunks.push(I.END);
+	yield Buffer.from(chunks);
+
+	const codeSize = chunks.length;
+
+	const offsetLut = [];
+
+	let total = 0;
+	for (const [str, lut] of walker.lookups.entries()) {
+		const buf = Buffer.from(str);
+		console.log(JSON.stringify(str));
+		offsetLut.push(total);
+		total += buf.length;
+		yield buf;
+	}
+
+	yield Buffer.from([I.END]);
+
+	function* generateLutBytes() {
+		for (const offset of offsetLut) {
+			yield* encodeInt(offset);
+		}
+	}
+
+	yield Buffer.from([...generateLutBytes()]);
+}
+
+function compile(source, acornOpts = {}) {
+	const buffers = [];
+	let totalLength = 0;
+
+	for (const buffer of generateBuffers(source, acornOpts)) {
+		buffers.push(buffer);
+		totalLength += buffer.length;
+	}
+
+	return Buffer.concat(buffers, totalLength);
 }
 
 const Pinch = {
