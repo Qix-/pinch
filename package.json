@@ -1,5 +1,6 @@
 {
 	"name": "@qix/pinch",
+	"private": true,
 	"description": "Compact Javascript into a small binary format",
 	"author": "Josh Junon (https://github.com/qix-)",
 	"main": "./index.mjs",
