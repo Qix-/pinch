@@ -1,0 +1,22 @@
+{
+	"name": "@qix/pinch",
+	"description": "Compact Javascript into a small binary format",
+	"author": "Josh Junon (https://github.com/qix-)",
+	"main": "./index.mjs",
+	"version": "0.0.0",
+	"type": "module",
+	"bin": {
+		"pinch": "./cli.mjs"
+	},
+	"engines": {
+		"node": "^12.20.0 || ^14.13.1 || >=16.0.0"
+	},
+	"devDependencies": {
+		"@vercel/git-hooks": "1.0.0",
+		"prettier": "2.3.1",
+		"pretty-quick": "3.1.0"
+	},
+	"dependencies": {
+		"acorn": "8.4.0"
+	}
+}
